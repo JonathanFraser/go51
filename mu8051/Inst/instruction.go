@@ -1,0 +1,51 @@
+package Inst
+
+
+type Command byte
+
+const (
+	ACALL Command = iota
+	ADD
+	ADDC
+	AJMP
+	ANL
+	CJNE
+	CLR
+	CPL
+	DA
+	DEC
+	DIV
+	DJNZ
+	INC
+	JB
+	JBC
+	JC
+	JMP
+	JNB
+	JNC
+	JNZ
+	JZ
+	LCALL
+	LJMP
+	MOV
+	MOVC
+	MOVX
+	MUL
+	NOP
+	ORL
+	POP
+	PUSH
+	RET
+	RETI
+	RL
+	RLC
+	RR
+	RRC
+	RETB
+	SJMP
+	SUBB
+	SWAP
+	XCH
+	XCHD
+	XRL
+)

@@ -44,7 +44,7 @@ func getByteArray(chars string) ([]byte, error) {
 	return append(frontVal, others...), nil
 }
 
-func parseHexLine(chars string) ([]byte, error) {
+func parseLine(chars string) ([]byte, error) {
 	if chars[0] != ':' {
 		return nil, errors.New("hex file line does not start with ':'")
 	}
@@ -61,7 +61,7 @@ func compareChecksum(data []byte) bool {
 
 func NewCmd(hex string) (Cmd, error) {
 	var ret Cmd
-	bytes, err := parseHexLine(hex)
+	bytes, err := parseLine(hex)
 	if err != nil {
 		return ret, err
 	}

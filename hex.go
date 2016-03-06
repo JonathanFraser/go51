@@ -52,6 +52,9 @@ var ErrNegativeOffset = errors.New("negative offset")
 //Whence value passed which was not the supported, other than (0,1,2)
 var ErrUnsupportedWhence = errors.New("whence value unsupported")
 
+//Returned from parse for all errors
+//Err contains the underlying reason for the error
+//Line contains the line number where the error occurred
 type ParseError struct {
 	Line int
 	Err  error
@@ -61,14 +64,33 @@ func (p ParseError) Error() string {
 	return fmt.Sprintf("parse error encountered on line %d: %s", p.Line, p.Err.Error())
 }
 
+//Enum of the type of intel hex records
 type Type uint8
 
 const (
+	//Record is of general data type, this is the data which will be present in memory
 	Data Type = iota
+
+	//Record is End of File, there should only be one of these
+	//and it should be the last line
 	EoF
+
+	//Record is of Extended Segment Address, data portion*16 specifies the offset
+	//to add to all future data records
 	ESA
+
+	//Record is of Start Segment Address, species the values of the CS and IP register
+	//not needed for anything other than x86 architectures. These values are stored but
+	//only one of these records per file is expected.
 	SSA
+
+	//Record is of Extended Linear Address type. The data field contains a 16-bit number
+	//which is the upper portion of all following addresses in a 32-bit address space.
 	ELA
+
+	//Record is of Start Linear Address type. The data field contains a 32-bit number
+	//to be loaded into the EIP register. This is only relavant for the 80386 architecture.
+	//This value is stored but only one of these records is expected.
 	SLA
 )
 
@@ -170,11 +192,14 @@ func parseHexFileRecords(r io.Reader) ([]rawRecord, error) {
 	return ret[:len(ret)-1], nil //strip the EOF record because not needed anymore
 }
 
+//A single data record
 type Record struct {
-	Offset uint32
-	Data   []byte
+	Offset uint32 //Offset in memory where the data block starts
+	Data   []byte //the data which sits in the memory segment
 }
 
+//a quick wrapper on a slice of Records so that they can be sorted in
+//offset order
 type RecordList []Record
 
 func (r RecordList) Len() int {
@@ -189,12 +214,15 @@ func (r RecordList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
+//Encapsulates all data for a parse intel hex file
+//CS,IP and EIP are x86 specific registers
 type File struct {
 	CS, IP uint16
 	EIP    uint32
-	Memory RecordList
+	Memory RecordList //contains the list of all the memory records in sorted order
 }
 
+//Parse an intel hex stream into memory
 func Parse(r io.Reader) (File, error) {
 	var ret File
 	rs, err := parseHexFileRecords(r)
@@ -275,7 +303,7 @@ func Parse(r io.Reader) (File, error) {
 	return ret, nil
 }
 
-//retrieve all memory records which overlap the requested
+//GetSegments retrieves all memory records which overlap the requested
 //memory range in offset sorted order
 func (f File) GetSegments(offset, length uint32) []Record {
 	var ret []Record
@@ -287,8 +315,9 @@ func (f File) GetSegments(offset, length uint32) []Record {
 	return ret
 }
 
-//retrieve a single byte from memory
-//if no overlap then returns the pad byte
+//GetByte retrieves a single byte from memory
+//if the specified address does not intersect
+//memory record then the pad byte is returned
 func (f File) GetByte(addr uint32, pad byte) byte {
 	s := f.GetSegments(addr, 1)
 	if len(s) == 0 {
@@ -312,24 +341,26 @@ func fillByte(addr uint32, dst *byte, r Record, pad byte) bool {
 	return false
 }
 
-//retrieve a memory segment locations which do not align with
-//a memory record are filled with pad byte
+//Retrieve a block of bytes beginning at offset and of length
+//len(dst). Any data in Records corrisponding to the address
+//are used and if a Record does not align, dst is filled with
+//pad.
 func (f File) Retrieve(offset uint32, dst []byte, pad byte) {
 	s := f.GetSegments(offset, uint32(len(dst)))
-	segment_index := 0
+	segIndex := 0
 	for i := range dst {
 		//check if we are out of segments
 		//if so finish the loop with pads
-		if segment_index == len(s) {
+		if segIndex == len(s) {
 			dst[i] = pad
 			continue
 		}
 		//if we are not within or before the selected segment
 		//advance the segment and retry
 		//if we run out of segments take the pad and then bail
-		for !fillByte(offset+uint32(i), &dst[i], s[segment_index], pad) {
-			segment_index++
-			if segment_index == len(s) {
+		for !fillByte(offset+uint32(i), &dst[i], s[segIndex], pad) {
+			segIndex++
+			if segIndex == len(s) {
 				dst[i] = pad
 				break
 			}
@@ -337,6 +368,8 @@ func (f File) Retrieve(offset uint32, dst []byte, pad byte) {
 	}
 }
 
+//Size retrieves the value of offset + length from
+//the last record. This is the highest specified data
 func (f File) Size() int64 {
 	if len(f.Memory) == 0 {
 		return 0
@@ -345,14 +378,37 @@ func (f File) Size() int64 {
 	return int64(last.Offset + uint32(len(last.Data)))
 }
 
+//Retriever specifies required interface to access
+//the file as a flat memory space
+type Retriever interface {
+	Retrieve(offset uint32, dst []byte, pad byte)
+}
+
+//Sizer is an object which can specify it's overall length
+type Sizer interface {
+	Size() int64
+}
+
+//Composite interface so that FileReader
+//can used additional types
+type RetrieveSizer interface {
+	Retriever
+	Sizer
+}
+
+//FileReader is a wrapper type to allow File (or composed types)
+//to support the idiomatic Read functionality and make the memory
+//seem more like a flat file. File does not specify contiguous blocks
+//of memory and so Pad is mapped to virtually fill that space
 type FileReader struct {
-	File         //embed the hex file
+	RetrieveSizer
 	Offset int64 //current offset within memory
 	Pad    byte  //byte to fill in unspecified locations
 }
 
+//Read provides support for the io.Reader interface
 func (fr *FileReader) Read(r []byte) (int, error) {
-	max := fr.File.Size() - fr.Offset
+	max := fr.Size() - fr.Offset
 	if max <= 0 { //no more to read so bail
 		return 0, io.EOF
 	}
@@ -367,6 +423,7 @@ func (fr *FileReader) Read(r []byte) (int, error) {
 	return len(r), nil
 }
 
+//ReadAt pulls data from a specific location in virtual memory space
 func (fr *FileReader) ReadAt(r []byte, off int64) (int, error) {
 	s := fr.Size()
 	fr.Retrieve(uint32(off), r, fr.Pad)
@@ -376,6 +433,8 @@ func (fr *FileReader) ReadAt(r []byte, off int64) (int, error) {
 	return len(r), nil
 }
 
+//Seek allows to movement of the internal offset, to control subsequent
+//Read calls.
 func (fr *FileReader) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case 0:

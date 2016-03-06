@@ -11,19 +11,46 @@ import (
 	"sort"
 )
 
-var InsufficentRecordLength = errors.New("record of insufficient length")
-var NoStartCode = errors.New("line not prefixed with start code ':'")
-var UnexpectedDecodeLength = errors.New("decoded hex string at unexpected length")
-var ChecksumError = errors.New("checksum invalid")
-var NoEOF = errors.New("failed to locate EOF record")
-var UnexpectedEOF = errors.New("encountered EOF on line other than the last")
-var ExtraBytes = errors.New("record contained extra data bytes")
-var InternalError = errors.New("an unexpected condition occurred")
-var IncorrectDataLength = errors.New("incorrect data field length for type")
-var UnknownDataType = errors.New("unrecognized data type")
-var SegmentOverlap = errors.New("segment overlap detected")
-var NegativeOffset = errors.New("negative offset")
-var UnsupportedWhence = errors.New("whence value unsupported")
+//record did not contain the minimum of 11 bytes on the line
+//there is not point in parsing further
+var ErrInsufficentRecordLength = errors.New("record of insufficient length")
+
+//did not find a colon as the first character on the line
+var ErrNoStartCode = errors.New("line not prefixed with start code ':'")
+
+//decoding the hex string resulted in an abnormal length byte slice
+var ErrUnexpectedDecodeLength = errors.New("decoded hex string at unexpected length")
+
+//line checksum did not match record
+var ErrChecksum = errors.New("checksum invalid")
+
+//file did not include and EOF record
+var ErrNoEOF = errors.New("failed to locate EOF record")
+
+//EOF record found on line other than the last line
+var ErrUnexpectedEOF = errors.New("encountered EOF on line other than the last")
+
+//There are more bytes in the data record than the length field specified
+var ErrExtraBytes = errors.New("record contained extra data bytes")
+
+//An internal precondition was violated, this is likely the result
+//of a code bug. Please report it to the issue tracker
+var ErrInternalError = errors.New("an unexpected condition occurred")
+
+//record type specifies a fixed length data block, the actual length disagrees
+var ErrIncorrectDataLength = errors.New("incorrect data field length for type")
+
+//data type is not one of the 6 recognized types
+var ErrUnknownDataType = errors.New("unrecognized data type")
+
+//Two records specify the data on the same address
+var ErrSegmentOverlap = errors.New("segment overlap detected")
+
+//Call to Seek resulted in offset before beginning
+var ErrNegativeOffset = errors.New("negative offset")
+
+//Whence value passed which was not the supported, other than (0,1,2)
+var ErrUnsupportedWhence = errors.New("whence value unsupported")
 
 type ParseError struct {
 	Line int
@@ -69,11 +96,11 @@ func parseRecord(r io.Reader) (rawRecord, error) {
 
 func parseRecordLine(bs []byte) (rawRecord, error) {
 	if len(bs) < 11 { //minimum line size including start code
-		return rawRecord{}, InsufficentRecordLength
+		return rawRecord{}, ErrInsufficentRecordLength
 	}
 
 	if bs[0] != ':' { //records all start with a colon
-		return rawRecord{}, NoStartCode
+		return rawRecord{}, ErrNoStartCode
 	}
 
 	var length = hex.DecodedLen(len(bs[1:]))
@@ -84,14 +111,14 @@ func parseRecordLine(bs []byte) (rawRecord, error) {
 	}
 
 	if n != length {
-		return rawRecord{}, UnexpectedDecodeLength
+		return rawRecord{}, ErrUnexpectedDecodeLength
 	}
 	var sum int8 //confirm the checksum
 	for _, v := range decoded {
 		sum += int8(v)
 	}
 	if sum != 0 {
-		return rawRecord{}, ChecksumError
+		return rawRecord{}, ErrChecksum
 	}
 
 	rdr := bytes.NewReader(decoded[:len(decoded)-1]) //convert new byte slice to reader
@@ -100,7 +127,7 @@ func parseRecordLine(bs []byte) (rawRecord, error) {
 		return rawRecord{}, err
 	}
 	if rdr.Len() != 0 { //check that all the data was consumed
-		return rawRecord{}, ExtraBytes
+		return rawRecord{}, ErrExtraBytes
 	}
 	return r, nil
 }
@@ -125,19 +152,19 @@ func parseHexFileRecords(r io.Reader) ([]rawRecord, error) {
 
 	//empty file is invalid file
 	if len(ret) == 0 {
-		return nil, NoEOF
+		return nil, ErrNoEOF
 	}
 
 	//make sure there is not EOF on a line other than the last
 	for i, v := range ret[:len(ret)-1] {
 		if v.Header.Type == EoF {
-			return nil, ParseError{Line: i, Err: UnexpectedEOF}
+			return nil, ParseError{Line: i, Err: ErrUnexpectedEOF}
 		}
 	}
 
 	//check that the last line is EOF
 	if ret[len(ret)-1].Header.Type != EoF {
-		return nil, NoEOF
+		return nil, ErrNoEOF
 	}
 
 	return ret[:len(ret)-1], nil //strip the EOF record because not needed anymore
@@ -186,11 +213,11 @@ func Parse(r io.Reader) (File, error) {
 			//OMGWTFBBQ - there should only be one EOF at the end
 			//this should have been verified and stripped previously
 			//this should never happen
-			return ret, InternalError
+			return ret, ErrInternalError
 		case ESA:
 			var temp uint16
 			if v.Header.Count != 2 {
-				return ret, ParseError{Line: i, Err: IncorrectDataLength}
+				return ret, ParseError{Line: i, Err: ErrIncorrectDataLength}
 			}
 			err := binary.Read(bytes.NewReader(v.Data), binary.BigEndian, &temp)
 			if err != nil {
@@ -200,7 +227,7 @@ func Parse(r io.Reader) (File, error) {
 		case SSA:
 			r := bytes.NewReader(v.Data)
 			if v.Header.Count != 4 {
-				return ret, ParseError{Line: i, Err: IncorrectDataLength}
+				return ret, ParseError{Line: i, Err: ErrIncorrectDataLength}
 			}
 			err := binary.Read(r, binary.BigEndian, &ret.CS)
 			if err != nil {
@@ -212,7 +239,7 @@ func Parse(r io.Reader) (File, error) {
 			}
 		case ELA:
 			if v.Header.Count != 2 {
-				return ret, ParseError{Line: i, Err: IncorrectDataLength}
+				return ret, ParseError{Line: i, Err: ErrIncorrectDataLength}
 			}
 			r := bytes.NewReader(v.Data)
 			var temp uint16
@@ -223,7 +250,7 @@ func Parse(r io.Reader) (File, error) {
 			offset = (1 << 16) * uint32(temp)
 		case SLA:
 			if v.Header.Count != 4 {
-				return ret, ParseError{Line: i, Err: IncorrectDataLength}
+				return ret, ParseError{Line: i, Err: ErrIncorrectDataLength}
 			}
 			r := bytes.NewReader(v.Data)
 			err := binary.Read(r, binary.BigEndian, &ret.EIP)
@@ -231,7 +258,7 @@ func Parse(r io.Reader) (File, error) {
 				return ret, ParseError{Line: i, Err: err}
 			}
 		default:
-			return ret, UnknownDataType
+			return ret, ErrUnknownDataType
 		}
 	}
 	if len(ret.Memory) == 0 {
@@ -241,7 +268,7 @@ func Parse(r io.Reader) (File, error) {
 	var prevoffset = int(ret.Memory[0].Offset) + len(ret.Memory[0].Data)
 	for _, v := range ret.Memory[1:] {
 		if int(v.Offset) < prevoffset {
-			return ret, SegmentOverlap
+			return ret, ErrSegmentOverlap
 		}
 		prevoffset = int(v.Offset) + len(v.Data)
 	}
@@ -319,24 +346,24 @@ func (f File) Size() int64 {
 }
 
 type FileReader struct {
-	File        //embed the hex file
-	Offset int  //current offset within memory
-	Pad    byte //byte to fill in unspecified locations
+	File         //embed the hex file
+	Offset int64 //current offset within memory
+	Pad    byte  //byte to fill in unspecified locations
 }
 
 func (fr *FileReader) Read(r []byte) (int, error) {
-	max := int(fr.File.Size()) - fr.Offset
+	max := fr.File.Size() - fr.Offset
 	if max <= 0 { //no more to read so bail
 		return 0, io.EOF
 	}
 
 	fr.Retrieve(uint32(fr.Offset), r, fr.Pad)
-	if len(r) > max {
+	if int64(len(r)) > max {
 		fr.Offset += max
-		return max, io.EOF
+		return int(max), io.EOF
 	}
 
-	fr.Offset += len(r)
+	fr.Offset += int64(len(r))
 	return len(r), nil
 }
 
@@ -356,12 +383,12 @@ func (fr *FileReader) Seek(offset int64, whence int) (int64, error) {
 	case 1:
 		fr.Offset += offset
 	case 2:
-		fr.Offset = fr.Size + offset
+		fr.Offset = fr.Size() + offset
 	default:
-		return fr.Offset, UnsupportedWhence
+		return fr.Offset, ErrUnsupportedWhence
 	}
 	if fr.Offset < 0 {
-		return fr.Offset, NegativeOffset
+		return fr.Offset, ErrNegativeOffset
 	}
 	return fr.Offset, nil
 }

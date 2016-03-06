@@ -1,3 +1,5 @@
+//Package intelhex provides tools for parsing the intel hex file format
+//as well as have it appear as a contiguous file, despite its sparse nature
 package intelhex
 
 import (
@@ -21,10 +23,10 @@ var ErrNoStartCode = errors.New("line not prefixed with start code ':'")
 //decoding the hex string resulted in an abnormal length byte slice
 var ErrUnexpectedDecodeLength = errors.New("decoded hex string at unexpected length")
 
-//line checksum did not match record
+//line checksum did not match that present in record
 var ErrChecksum = errors.New("checksum invalid")
 
-//file did not include and EOF record
+//file did not include an EOF record
 var ErrNoEOF = errors.New("failed to locate EOF record")
 
 //EOF record found on line other than the last line

@@ -64,31 +64,31 @@ func (p ParseError) Error() string {
 	return fmt.Sprintf("parse error encountered on line %d: %s", p.Line, p.Err.Error())
 }
 
-//Enum of the type of intel hex records
+//Type is an Enum of the supported kinds of intel hex records
 type Type uint8
 
 const (
-	//A Data Type indicates Record is of general data type, this is the data which will be present in memory
+	//Data indicates Record is of general data type, this is the data which will be present in memory
 	Data Type = iota
 
-	//A EoF Type indicates Record is End of File, there should only be one of these
+	//EoF indicates Record is End of File, there should only be one of these
 	//and it should be the last line
 	EoF
 
-	//An ESA Type indicates Record is of Extended Segment Address, data portion*16 specifies the offset
+	//ESA indicates Record is of Extended Segment Address, data portion*16 specifies the offset
 	//to add to all future data records
 	ESA
 
-	//A SSA Type indicates Record is of Start Segment Address, species the values of the CS and IP register
+	//SSA indicates Record is of Start Segment Address, species the values of the CS and IP register
 	//not needed for anything other than x86 architectures. These values are stored but
 	//only one of these records per file is expected.
 	SSA
 
-	//An ELA Type indicates Record is of Extended Linear Address type. The data field contains a 16-bit number
+	//ELA indicates Record is of Extended Linear Address type. The data field contains a 16-bit number
 	//which is the upper portion of all following addresses in a 32-bit address space.
 	ELA
 
-	//An SLA Type indicates Record is of Start Linear Address type. The data field contains a 32-bit number
+	//SLA  indicates Record is of Start Linear Address type. The data field contains a 32-bit number
 	//to be loaded into the EIP register. This is only relavant for the 80386 architecture.
 	//This value is stored but only one of these records is expected.
 	SLA

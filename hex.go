@@ -52,7 +52,7 @@ var ErrNegativeOffset = errors.New("negative offset")
 //Whence value passed which was not the supported, other than (0,1,2)
 var ErrUnsupportedWhence = errors.New("whence value unsupported")
 
-//Returned from parse for all errors
+//ParseError is returned from parse for all errors
 //Err contains the underlying reason for the error
 //Line contains the line number where the error occurred
 type ParseError struct {
@@ -68,27 +68,27 @@ func (p ParseError) Error() string {
 type Type uint8
 
 const (
-	//Record is of general data type, this is the data which will be present in memory
+	//A Data Type indicates Record is of general data type, this is the data which will be present in memory
 	Data Type = iota
 
-	//Record is End of File, there should only be one of these
+	//A EoF Type indicates Record is End of File, there should only be one of these
 	//and it should be the last line
 	EoF
 
-	//Record is of Extended Segment Address, data portion*16 specifies the offset
+	//An ESA Type indicates Record is of Extended Segment Address, data portion*16 specifies the offset
 	//to add to all future data records
 	ESA
 
-	//Record is of Start Segment Address, species the values of the CS and IP register
+	//A SSA Type indicates Record is of Start Segment Address, species the values of the CS and IP register
 	//not needed for anything other than x86 architectures. These values are stored but
 	//only one of these records per file is expected.
 	SSA
 
-	//Record is of Extended Linear Address type. The data field contains a 16-bit number
+	//An ELA Type indicates Record is of Extended Linear Address type. The data field contains a 16-bit number
 	//which is the upper portion of all following addresses in a 32-bit address space.
 	ELA
 
-	//Record is of Start Linear Address type. The data field contains a 32-bit number
+	//An SLA Type indicates Record is of Start Linear Address type. The data field contains a 32-bit number
 	//to be loaded into the EIP register. This is only relavant for the 80386 architecture.
 	//This value is stored but only one of these records is expected.
 	SLA
@@ -192,14 +192,14 @@ func parseHexFileRecords(r io.Reader) ([]rawRecord, error) {
 	return ret[:len(ret)-1], nil //strip the EOF record because not needed anymore
 }
 
-//A single data record
+//Record is a single contiguous block of specified memory
 type Record struct {
 	Offset uint32 //Offset in memory where the data block starts
 	Data   []byte //the data which sits in the memory segment
 }
 
-//a quick wrapper on a slice of Records so that they can be sorted in
-//offset order
+//RecordList is a simple wrapper on a slice of
+//Records so that they can be sorted in offset order
 type RecordList []Record
 
 func (r RecordList) Len() int {
@@ -214,7 +214,7 @@ func (r RecordList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-//Encapsulates all data for a parse intel hex file
+//File encapsulates all data for a parsed intel hex file
 //CS,IP and EIP are x86 specific registers
 type File struct {
 	CS, IP uint16
@@ -389,8 +389,8 @@ type Sizer interface {
 	Size() int64
 }
 
-//Composite interface so that FileReader
-//can used additional types
+//RetrieveSizer is a composite interface so that FileReader
+//can used additional types, aside from File
 type RetrieveSizer interface {
 	Retriever
 	Sizer

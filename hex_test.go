@@ -1,4 +1,4 @@
-package intelhex
+package gohex
 
 import (
 	"bytes"

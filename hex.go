@@ -1,6 +1,6 @@
 //Package intelhex provides tools for parsing the intel hex file format
 //as well as have it appear as a contiguous file, despite its sparse nature
-package intelhex
+package gohex
 
 import (
 	"bufio"

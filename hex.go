@@ -22,6 +22,8 @@ var InternalError = errors.New("an unexpected condition occurred")
 var IncorrectDataLength = errors.New("incorrect data field length for type")
 var UnknownDataType = errors.New("unrecognized data type")
 var SegmentOverlap = errors.New("segment overlap detected")
+var NegativeOffset = errors.New("negative offset")
+var UnsupportedWhence = errors.New("whence value unsupported")
 
 type ParseError struct {
 	Line int
@@ -345,4 +347,21 @@ func (fr *FileReader) ReadAt(r []byte, off int64) (int, error) {
 		return int(s - off), io.EOF
 	}
 	return len(r), nil
+}
+
+func (fr *FileReader) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case 0:
+		fr.Offset = offset
+	case 1:
+		fr.Offset += offset
+	case 2:
+		fr.Offset = fr.Size + offset
+	default:
+		return fr.Offset, UnsupportedWhence
+	}
+	if fr.Offset < 0 {
+		return fr.Offset, NegativeOffset
+	}
+	return fr.Offset, nil
 }

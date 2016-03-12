@@ -1,5 +1,4 @@
-package Inst
-
+package core
 
 type Command byte
 

@@ -1,4 +1,4 @@
-//implements the central processing core of an 8051 processor
+//Package mu51 implements the central processing core of an 8051 processor
 package mu51
 
 //CodeMemory is a read-only interface which Processor
@@ -16,6 +16,8 @@ type RAMemory interface {
 	Size() int64
 }
 
+//Processor is the generic interface supported by any 8051 compatible core
+//it is implimented by the various varients
 type Processor interface {
 	//specify a function to be called when the cpu core
 	//writes to a cpu port

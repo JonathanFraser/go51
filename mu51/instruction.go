@@ -346,38 +346,9 @@ type Operation func(*CPU) error
 
 //convert opcode and extra data pair into a permutation function
 func DecodeInstruction(op OpCode, data []byte) Operation {
-	lengthCheck := func(length uint8) {
-		if int(length) != len(data) {
-			panic("unexpected length error")
-		}
-	}
 	switch op {
-	case ACALL:
-		return func(c *CPU) error {
-			lengthCheck(2)
-			//compute where the next instruction is located at
-			c.ProgCount += 2
-			c.PushWord(c.ProgCount)
-			next := c.ProgCount & 0xF800 //preserve the top bits of Program counter
-			//grab the 3 bytes of the address from opcode (7-5)
-			next = next | uint16(data[0]>>5)<<8
-			//lsb of program counter is in the extra byte
-			next = next | uint16(data[1])
-			c.ProgCount = next //reset program counter
-			return nil
-		}
 	case ADD:
 	case ADDC:
-	case AJMP:
-		return func(c *CPU) error {
-			lengthCheck(2)
-			c.ProgCount += 2
-			next := c.ProgCount & 0xF800
-			next = next | uint16(data[0]>>5)<<8
-			next = next | uint16(data[1])
-			c.ProgCount = next
-			return nil
-		}
 	case ANL:
 	case CJNE:
 	case CLR:
@@ -400,36 +371,8 @@ func DecodeInstruction(op OpCode, data []byte) Operation {
 	case MOV:
 	case MOVC:
 	case MOVX:
-	case MUL:
 	case NOP:
 	case ORL:
-	case POP:
-		return func(c *CPU) error {
-			lengthCheck(2)
-			if len(data) != 2 {
-				panic("unexpected data length") //internal inconsisency error
-			}
-			c.InternalRAM[data[1]] = c.PopByte()
-			return nil
-		}
-	case PUSH:
-		return func(c *CPU) error {
-			lengthCheck(2)
-			c.PushByte(c.InternalRAM[data[1]])
-			return nil
-		}
-	case RET:
-		return func(c *CPU) error {
-			lengthCheck(1)
-			c.ProgCount = c.PopWord()
-			return nil
-		}
-	case RETI:
-		return func(c *CPU) error {
-			lengthCheck(1)
-			c.ProgCount = c.PopWord()
-			return nil
-		}
 	case RL:
 	case RLC:
 	case RR:
@@ -438,10 +381,8 @@ func DecodeInstruction(op OpCode, data []byte) Operation {
 	case SJMP:
 	case SETB:
 	case SUBB:
-	case SWAP:
-	case XCH:
 	case XCHD:
 	case XRL:
 	}
-	return func(*CPU) error { return ErrUnknownOpCode }
+	return nil
 }

@@ -46,7 +46,6 @@ const (
 	RLC
 	RR
 	RRC
-	RETB
 	SJMP
 	SETB
 	SUBB
@@ -347,8 +346,6 @@ type Operation func(*CPU) error
 //convert opcode and extra data pair into a permutation function
 func DecodeInstruction(op OpCode, data []byte) Operation {
 	switch op {
-	case ADD:
-	case ADDC:
 	case ANL:
 	case CJNE:
 	case CLR:
@@ -366,8 +363,6 @@ func DecodeInstruction(op OpCode, data []byte) Operation {
 	case JNC:
 	case JNZ:
 	case JZ:
-	case LCALL:
-	case LJMP:
 	case MOV:
 	case MOVC:
 	case MOVX:
@@ -377,7 +372,6 @@ func DecodeInstruction(op OpCode, data []byte) Operation {
 	case RLC:
 	case RR:
 	case RRC:
-	case RETB:
 	case SJMP:
 	case SETB:
 	case SUBB:
